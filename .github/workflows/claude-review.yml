@@ -1,0 +1,58 @@
+name: Claude — automatic PR review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Review pull request
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event.pull_request.draft == false
+    # No contents: write. This workflow fires automatically, including on commits
+    # Claude itself just pushed via the dispatch workflow. Comment-only is enforced
+    # twice: here, and again by the --allowedTools list below.
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          track_progress: true
+          use_sticky_comment: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this pull request against the conventions in AGENTS.md:
+            camelCase for variables and functions, PascalCase for components and
+            types, strict TypeScript, oxlint via .oxlintrc.json, oxfmt formatting,
+            MobX stores in packages/shared-state.
+
+            Focus on, in order:
+
+            1. Correctness — logic errors, unhandled edge cases, wrong async handling.
+            2. Security — injection, auth gaps, unsafe rendering of user input.
+            3. Error handling — try/catch with proper error types.
+            4. Consistency — divergence from patterns in the surrounding package.
+
+            Use inline comments for specific line-level issues. Use one top-level
+            comment for general observations.
+
+            Be concise and concrete. If the diff is small and clean, say so in one
+            or two sentences rather than manufacturing feedback.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep,Glob"
