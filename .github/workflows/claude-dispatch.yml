@@ -9,17 +9,14 @@ on:
         type: choice
         default: test-coverage-gaps.md
         options:
-          - test-coverage-gaps.md
-          - security-audit.md
           - idor-tenant-isolation.md
           - n-plus-one-queries.md
           - secret-scan.md
+          - security-audit.md
           - public-endpoints.md
           - dead-code.md
           - api-versioning.md
-          - code-review.md
-          - i18n-drift.md
-          - dependency-audit.md
+          - test-coverage-gaps.md
       prompt:
         description: "Free-text prompt — overrides the saved prompt above when non-empty"
         required: false

@@ -38,17 +38,14 @@ gh workflow run claude-dispatch.yml --ref feat/workshop \
 
 | File | Purpose |
 |---|---|
-| `test-coverage-gaps.md` | Highest-risk missing tests (default) |
-| `security-audit.md` | Injection, auth, secrets, unsafe rendering |
-| `idor-tenant-isolation.md` | Cross-tenant/IDOR access checks |
-| `n-plus-one-queries.md` | N+1 query detection in the Django ORM layer |
+| `idor-tenant-isolation.md` | Multi-tenancy/IDOR checks (one user spoofing another user's id in the payload) |
+| `n-plus-one-queries.md` | Performance: N+1 query detection in the Django ORM layer |
 | `secret-scan.md` | Committed secrets and credentials |
-| `public-endpoints.md` | Unauthenticated endpoint audit |
-| `dead-code.md` | Unused functions, components, and exports |
+| `security-audit.md` | Security issues in the project (injection, auth, unsafe rendering) |
+| `public-endpoints.md` | Public/unauthenticated endpoint audit |
+| `dead-code.md` | Dead code: unused functions, components, and exports |
 | `api-versioning.md` | API versioning strategy assessment |
-| `code-review.md` | General code quality review |
-| `i18n-drift.md` | Locale key drift in `packages/i18n` |
-| `dependency-audit.md` | Catalog bypasses, version skew, phantom deps |
+| `test-coverage-gaps.md` | Meaningful test coverage gaps (default) |
 
 Adding a prompt takes two edits: create the file in `.github/prompts/`, then add its
 filename to the `options:` list of the `prompt_file` input in `claude-dispatch.yml`.
