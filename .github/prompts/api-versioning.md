@@ -22,3 +22,19 @@ Report your findings plainly: what exists today, the concrete risk of shipping
 breaking changes without versioning, and — only if asked for a recommendation —
 a minimal versioning approach that would fit this codebase's existing URL
 structure. Do not implement anything.
+
+
+## Output format
+
+Keep the report short and skimmable — it's read as a GitHub Actions job
+summary, not a document. Follow this shape exactly:
+
+- Line 1: one-sentence verdict — total finding count and worst severity
+  (e.g. "3 findings, 1 critical").
+- One bullet per finding: `file:line` — issue in one clause — fix in one
+  clause. No sub-bullets, no code blocks, no restating file contents.
+- Skip preamble, skip restating this prompt, skip narrating files you
+  checked and found clean.
+- Cap at 10 findings, ordered most severe/valuable first. If you found
+  more, say "N more found, showing top 10" — don't list them all.
+- If there is nothing to report, say so in one line and stop.

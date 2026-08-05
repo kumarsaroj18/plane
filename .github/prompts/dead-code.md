@@ -18,3 +18,19 @@ For each finding, give the file path, the symbol name, and how you confirmed no
 references exist (e.g. "grepped for `ComponentName` repo-wide, only match is its
 own definition and export"). Rank by file size removed if deleted — largest
 first. Do not delete anything. Report only.
+
+
+## Output format
+
+Keep the report short and skimmable — it's read as a GitHub Actions job
+summary, not a document. Follow this shape exactly:
+
+- Line 1: one-sentence verdict — total finding count and worst severity
+  (e.g. "3 findings, 1 critical").
+- One bullet per finding: `file:line` — issue in one clause — fix in one
+  clause. No sub-bullets, no code blocks, no restating file contents.
+- Skip preamble, skip restating this prompt, skip narrating files you
+  checked and found clean.
+- Cap at 10 findings, ordered most severe/valuable first. If you found
+  more, say "N more found, showing top 10" — don't list them all.
+- If there is nothing to report, say so in one line and stop.
