@@ -1,0 +1,106 @@
+name: Claude — manual prompt runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      prompt_file:
+        description: "Saved prompt to run (ignored if free-text prompt is filled in)"
+        required: true
+        type: choice
+        default: test-coverage-gaps.md
+        options:
+          - test-coverage-gaps.md
+          - security-audit.md
+          - idor-tenant-isolation.md
+          - n-plus-one-queries.md
+          - secret-scan.md
+          - public-endpoints.md
+          - dead-code.md
+          - api-versioning.md
+          - code-review.md
+          - i18n-drift.md
+          - dependency-audit.md
+      prompt:
+        description: "Free-text prompt — overrides the saved prompt above when non-empty"
+        required: false
+        type: string
+        default: ""
+      model:
+        description: "Model to run with"
+        required: true
+        type: choice
+        default: sonnet
+        options:
+          - sonnet
+          - opus
+          - haiku
+      scope:
+        description: "Optional path to focus on, e.g. apps/web"
+        required: false
+        type: string
+        default: ""
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run-prompt:
+    name: Run prompt
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      # Inputs are bound to env rather than interpolated into the script body.
+      # Interpolating ${{ inputs.prompt }} directly into run: would let prompt
+      # text terminate the shell command and execute arbitrary code.
+      - name: Resolve prompt
+        id: resolve
+        env:
+          FREE_TEXT: ${{ inputs.prompt }}
+          PROMPT_FILE: ${{ inputs.prompt_file }}
+          SCOPE: ${{ inputs.scope }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "${FREE_TEXT}" ]; then
+            SOURCE="free-text"
+            BODY="${FREE_TEXT}"
+          else
+            SOURCE=".github/prompts/${PROMPT_FILE}"
+            if [ ! -f "${SOURCE}" ]; then
+              echo "::error::Prompt file not found: ${SOURCE}"
+              exit 1
+            fi
+            BODY="$(cat "${SOURCE}")"
+          fi
+
+          echo "Prompt source: ${SOURCE}"
+
+          {
+            echo "body<<CLAUDE_PROMPT_EOF"
+            echo "REPO: ${GITHUB_REPOSITORY}"
+            echo "BRANCH: ${GITHUB_REF_NAME}"
+            if [ -n "${SCOPE}" ]; then
+              echo "SCOPE: restrict your analysis to the path '${SCOPE}'"
+            fi
+            echo ""
+            echo "${BODY}"
+            echo "CLAUDE_PROMPT_EOF"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Run Claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: ${{ steps.resolve.outputs.body }}
+          claude_args: --model ${{ inputs.model }} --max-turns 30
