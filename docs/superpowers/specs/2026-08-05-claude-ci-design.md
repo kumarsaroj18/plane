@@ -113,10 +113,14 @@ through corepack.
 
 ## 3. Claude workflows
 
-| File | Trigger | Permissions |
+Every Claude job additionally needs `id-token: write`, which the upstream examples in
+`anthropics/claude-code-action` include on all modes. It is omitted from the table
+below only to keep the contrast between write and comment-only legible.
+
+| File | Trigger | Permissions (plus `id-token: write`) |
 |---|---|---|
 | `claude-dispatch.yml` | `workflow_dispatch` | `contents: write`, `pull-requests: write`, `issues: write` |
-| `claude-mention.yml` | `issue_comment`, `pull_request_review_comment`, `issues` | `contents: write`, `pull-requests: write`, `issues: write` |
+| `claude-mention.yml` | `issue_comment`, `pull_request_review_comment`, `pull_request_review`, `issues` | `contents: write`, `pull-requests: write`, `issues: write` |
 | `claude-review.yml` | `pull_request` (opened, synchronize, reopened, ready_for_review) | `contents: read`, `pull-requests: write` |
 
 ### `claude-dispatch.yml`
