@@ -43,18 +43,19 @@ needed: turbo resolves the build dependency itself.
 | Relationship to inherited CI | Build fresh workflows alongside; leave the nine upstream files untouched |
 | CI scope | Lean: lint + types on changed code only |
 | Auth | `CLAUDE_CODE_OAUTH_TOKEN` (subscription), not an API key |
-| Triggers | All four: manual dispatch, `@claude` mention, auto PR review, scheduled cron |
-| Permissions | Write for deliberate triggers (dispatch, mention); comment-only for unattended (review, cron) |
+| Triggers | On-demand only: manual dispatch, `@claude` mention, auto PR review. No cron. |
+| Permissions | Write for deliberate triggers (dispatch, mention); comment-only for automatic PR review |
 | Prompt library | Versioned `.github/prompts/*.md` files plus a free-text override |
 | Layout | One workflow file per trigger |
 
 ### Why one file per trigger
 
 The permission split is the deciding factor. `permissions:` is scoped per job, and
-the unattended triggers must not have `contents: write`. A single consolidated
-workflow would need a permissions block that is the union of all modes, which grants
-write access to the cron run and defeats the guardrail. Separate files express the
-distinction structurally rather than by convention.
+`claude-review.yml` must not have `contents: write`: it fires automatically on every
+PR, including on code Claude itself just pushed. A single consolidated workflow would
+need a permissions block that is the union of all modes, which hands write access to
+that automatic path and defeats the guardrail. Separate files express the distinction
+structurally rather than by convention.
 
 The cost is roughly fifteen lines of repeated checkout and auth boilerplate per file.
 For a workshop artifact that repetition is a feature: each file reads top to bottom
@@ -69,7 +70,6 @@ scope here.
 .github/workflows/claude-dispatch.yml   # manual prompt runner   WRITE
 .github/workflows/claude-mention.yml    # @claude in comments    WRITE
 .github/workflows/claude-review.yml     # automatic PR review    COMMENT-ONLY
-.github/workflows/claude-scheduled.yml  # scheduled prompts      COMMENT-ONLY
 .github/prompts/*.md                    # versioned prompt library
 ```
 
@@ -86,7 +86,6 @@ Every job sets a `concurrency` group with `cancel-in-progress: true` and an expl
 | `claude-dispatch.yml` | 30 |
 | `claude-mention.yml` | 30 |
 | `claude-review.yml` | 20 |
-| `claude-scheduled.yml` | 30 |
 
 ## 2. `ci.yml`
 
@@ -119,7 +118,6 @@ through corepack.
 | `claude-dispatch.yml` | `workflow_dispatch` | `contents: write`, `pull-requests: write`, `issues: write` |
 | `claude-mention.yml` | `issue_comment`, `pull_request_review_comment`, `issues` | `contents: write`, `pull-requests: write`, `issues: write` |
 | `claude-review.yml` | `pull_request` (opened, synchronize, reopened, ready_for_review) | `contents: read`, `pull-requests: write` |
-| `claude-scheduled.yml` | `schedule` plus `workflow_dispatch` | `contents: read`, `issues: write` |
 
 ### `claude-dispatch.yml`
 
@@ -155,18 +153,6 @@ accumulating new ones, and `track_progress: true` for visible progress.
 `claude_args` restricts the tool set to read-only tools. Comment-only is therefore
 enforced at two layers: the workflow `permissions` block and the tool allowlist.
 
-### `claude-scheduled.yml`
-
-Runs a prompt from the library on a cron schedule and files findings as a GitHub
-issue. Also exposes `workflow_dispatch`.
-
-Schedule is `0 3 * * 1` — 03:00 UTC each Monday. Weekly rather than nightly: the
-prompts in scope (dependency drift, i18n drift, coverage gaps) do not change
-meaningfully day to day on a fork with a single contributor, and a weekly cadence
-keeps subscription usage low.
-
-The default prompt is `dependency-audit.md`, overridable via the dispatch input.
-
 ## 4. Prompt library
 
 Plain markdown files, no frontmatter. Initial set:
@@ -181,13 +167,12 @@ Each references the conventions in `AGENTS.md` so output matches house style.
 
 ## 5. Fork-specific constraints
 
-- **Scheduled workflows are disabled by default in forked repositories**, and GitHub
-  additionally disables cron workflows after 60 days of repository inactivity.
-  `claude-scheduled.yml` therefore also exposes `workflow_dispatch`, so its behaviour is
-  testable on demand instead of only observable overnight.
-- **Pull requests originating from other forks do not receive repository secrets**, so
-  `claude-review.yml` will not run Claude on them. This is acceptable here because the
-  working pattern is `feat/*` to `preview` within a single fork.
+**Pull requests originating from other forks do not receive repository secrets**, so
+`claude-review.yml` will not run Claude on them. This is acceptable here because the
+working pattern is `feat/*` to `preview` within a single fork.
+
+The constraint around scheduled workflows being disabled by default on forks no longer
+applies, since nothing runs on a cron. See "Dropped from scope" below.
 
 ## 6. Prerequisites
 
@@ -202,14 +187,30 @@ Verified present on 2026-08-05 via `gh secret list`.
 
 ## 7. Verification
 
-1. `actionlint` across all five workflow files for YAML and expression validity.
+1. `actionlint` across all four workflow files for YAML and expression validity.
 2. `gh workflow run claude-dispatch.yml` with a trivial prompt.
 3. A throwaway PR into `preview` to exercise `ci.yml` and `claude-review.yml`.
 4. A comment containing `@claude` to exercise `claude-mention.yml`.
-5. `gh workflow run claude-scheduled.yml` to exercise the cron path without waiting.
 
 Each workflow is considered done only when observed green in an actual run, not when
 the YAML is merely written.
+
+## Dropped from scope
+
+A scheduled `claude-scheduled.yml` running prompts on a weekly cron was designed and
+then cut before implementation. Claude now runs only when explicitly invoked: a
+dispatch button, an `@claude` comment, or opening a PR.
+
+Consequences of the cut:
+
+- No `schedule:` trigger exists, so the fork-specific rules about cron workflows being
+  disabled by default and auto-disabling after 60 days of inactivity are irrelevant.
+- Subscription usage is bounded by deliberate actions rather than a recurring job.
+- The `dependency-audit.md`, `i18n-drift.md`, and `test-coverage-gaps.md` prompts stay
+  in the library. They were the intended cron payloads and remain useful on demand
+  through `claude-dispatch.yml`.
+
+Re-adding a cron later is additive: one new workflow file reusing an existing prompt.
 
 ## Out of scope
 
