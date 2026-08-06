@@ -136,7 +136,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: ${{ steps.resolve.outputs.body }}
-          claude_args: --model ${{ inputs.model }} --max-turns 60
+          claude_args: --model ${{ inputs.model }} --max-turns 60 --allowedTools "Read,Grep,Glob,Bash,Write"
 
       - name: Post report
         if: always() && steps.issue.outputs.number != ''
