@@ -118,14 +118,14 @@ jobs:
             echo "REPORT DELIVERY: your response in this conversation is not seen by"
             echo "anyone. When your analysis is complete, write the report (following"
             echo "the Output format section above, verbatim structure — the emoji"
-            echo "verdict line, the collapsible <details> blocks) to /tmp/report.md"
+            echo "verdict line, the collapsible <details> blocks) to .claude-dispatch-report.md"
             echo "using your file-write tool. Do not run gh yourself and do not post"
-            echo "anything — a separate step posts /tmp/report.md as issue"
+            echo "anything — a separate step posts .claude-dispatch-report.md as issue"
             echo "#${ISSUE_NUMBER} for you once you finish."
             echo "CLAUDE_PROMPT_EOF"
           } >> "${GITHUB_OUTPUT}"
 
-      # Claude only writes /tmp/report.md — it never gets the repo-write
+      # Claude only writes .claude-dispatch-report.md — it never gets the repo-write
       # token itself. inputs.prompt is free text on a manual dispatch, and
       # the agent also reads repo files during analysis, either of which is
       # a prompt-injection vector; keeping gh (and its contents/PR/issues
@@ -145,9 +145,9 @@ jobs:
         run: |
           set -euo pipefail
           NUM="${{ steps.issue.outputs.number }}"
-          if [ -f /tmp/report.md ]; then
-            gh issue comment "${NUM}" --body-file /tmp/report.md
+          if [ -f .claude-dispatch-report.md ]; then
+            gh issue comment "${NUM}" --body-file .claude-dispatch-report.md
           else
-            gh issue comment "${NUM}" --body "⚠️ Claude run finished without writing /tmp/report.md — check the job log for what happened."
+            gh issue comment "${NUM}" --body "⚠️ Claude run finished without writing .claude-dispatch-report.md — check the job log for what happened."
           fi
           gh issue close "${NUM}"
