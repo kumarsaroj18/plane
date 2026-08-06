@@ -37,22 +37,69 @@ jobs:
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
 
-            Review this pull request against the conventions in AGENTS.md:
-            camelCase for variables and functions, PascalCase for components and
-            types, strict TypeScript, oxlint via .oxlintrc.json, oxfmt formatting,
-            MobX stores in packages/shared-state.
+            Review this pull request's diff against the conventions in AGENTS.md
+            (camelCase for variables/functions, PascalCase for components/types,
+            strict TypeScript, oxlint via .oxlintrc.json, oxfmt formatting, MobX
+            stores in packages/shared-state) AND check it against these 8 areas,
+            scoped to what the diff actually touches:
 
-            Focus on, in order:
+            1. Multi-tenancy / IDOR — can a payload field or unscoped `pk`/`id`
+               lookup let one user act on another user's or workspace's data?
+            2. Performance (N+1) — new queries in a loop, missing
+               `select_related`/`prefetch_related`.
+            3. Secrets — credentials, tokens, or keys introduced in this diff.
+            4. Security — injection, auth gaps, unsafe rendering of user input.
+            5. Public endpoints — a view that lost its permission class, or
+               that leaks more than an intentionally public endpoint should.
+            6. Dead code — code this diff makes unreachable but doesn't remove.
+            7. API versioning — a breaking change to an existing endpoint shape
+               with no versioning or migration story.
+            8. Test coverage — meaningful test gaps for the changed logic,
+               especially auth/permission paths and data mutations.
 
-            1. Correctness — logic errors, unhandled edge cases, wrong async handling.
-            2. Security — injection, auth gaps, unsafe rendering of user input.
-            3. Error handling — try/catch with proper error types.
-            4. Consistency — divergence from patterns in the surrounding package.
+            Post one top-level PR comment as the report. Also use inline comments
+            for specific line-level issues where the diff makes the location
+            unambiguous.
 
-            Use inline comments for specific line-level issues. Use one top-level
-            comment for general observations.
+            Output format for the top-level comment — GitHub renders this PR
+            comment as markdown with collapsible sections, so match this
+            structure exactly:
 
-            Be concise and concrete. If the diff is small and clean, say so in one
-            or two sentences rather than manufacturing feedback.
+            1. One verdict line first: emoji + severity counts, e.g.
+               `🔴 1 HIGH, 🟡 1 MEDIUM` — or `✅ No findings` if the diff is clean.
+            2. A summary table with exactly these 8 rows, one per area above, each
+               marked `✅` (clean) or its worst emoji + finding count:
+
+               | # | Section | Result |
+               |---|---------|--------|
+               | 1 | Multi-tenancy / IDOR | ✅ |
+               | 2 | Performance (N+1) | ✅ |
+               | 3 | Secrets | ✅ |
+               | 4 | Security | ✅ |
+               | 5 | Public endpoints | ✅ |
+               | 6 | Dead code | ✅ |
+               | 7 | API versioning | ✅ |
+               | 8 | Test coverage | ✅ |
+
+            3. One collapsible `<details>` block per finding, most severe first:
+
+               <details open>
+               <summary>🔴 <b>HIGH</b> — one-line title · <code>path/to/file.py:42</code></summary>
+
+               **What's wrong** — one to three sentences.
+
+               **Attack** — the exact request that exploits it. Omit for
+               non-exploit findings (dead code, test gaps, versioning).
+
+               **Fix**
+               ```python
+               <the actual patch>
+               ```
+               </details>
+
+               Only the single most severe finding uses `<details open>`; every
+               other finding uses `<details>` (collapsed).
+            4. If the diff is small and clean, say so in the verdict line and
+               skip the table and details — don't manufacture feedback.
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep,Glob"
