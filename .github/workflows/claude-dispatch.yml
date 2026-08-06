@@ -57,6 +57,25 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The job summary for a plain workflow_dispatch run (no PR/issue in the
+      # triggering event) only ever shows Claude's raw tool-call trace, not a
+      # synthesized report — that polished card only renders when the action
+      # posts an actual PR/issue comment. So Claude gets its own throwaway
+      # issue to report into, closed once it's posted.
+      - name: Create report issue
+        id: issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROMPT_FILE: ${{ inputs.prompt_file }}
+        run: |
+          set -euo pipefail
+          TITLE="Claude dispatch: ${PROMPT_FILE:-free-text} — ${GITHUB_REF_NAME}"
+          URL="$(gh issue create --title "${TITLE}" \
+            --body "Running on \`${GITHUB_REF_NAME}\`. Report posts below when the run finishes.")"
+          echo "url=${URL}" >> "${GITHUB_OUTPUT}"
+          echo "number=${URL##*/}" >> "${GITHUB_OUTPUT}"
+          echo "Report issue: ${URL}" >> "${GITHUB_STEP_SUMMARY}"
+
       # Inputs are bound to env rather than interpolated into the script body.
       # Interpolating ${{ inputs.prompt }} directly into run: would let prompt
       # text terminate the shell command and execute arbitrary code.
@@ -66,6 +85,7 @@ jobs:
           FREE_TEXT: ${{ inputs.prompt }}
           PROMPT_FILE: ${{ inputs.prompt_file }}
           SCOPE: ${{ inputs.scope }}
+          ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
         run: |
           set -euo pipefail
 
@@ -92,13 +112,30 @@ jobs:
             fi
             echo ""
             echo "${BODY}"
+            echo ""
+            echo "---"
+            echo ""
+            echo "REPORT DELIVERY: your response in this conversation is not seen by"
+            echo "anyone. The deliverable is a single comment on issue #${ISSUE_NUMBER}."
+            echo "When your analysis is complete, write the report (following the"
+            echo "Output format section above, verbatim structure — the emoji verdict"
+            echo "line, the collapsible <details> blocks) to /tmp/report.md, then run:"
+            echo "  gh issue comment ${ISSUE_NUMBER} --body-file /tmp/report.md"
+            echo "Post exactly one comment. Do not post progress updates."
             echo "CLAUDE_PROMPT_EOF"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Run Claude
         uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: ${{ steps.resolve.outputs.body }}
-          display_report: true
           claude_args: --model ${{ inputs.model }} --max-turns 30
+
+      - name: Close report issue
+        if: always() && steps.issue.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh issue close "${{ steps.issue.outputs.number }}"
