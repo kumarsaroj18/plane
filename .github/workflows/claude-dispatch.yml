@@ -45,7 +45,7 @@ jobs:
   run-prompt:
     name: Run prompt
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     permissions:
       contents: write
       pull-requests: write
@@ -136,7 +136,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: ${{ steps.resolve.outputs.body }}
-          claude_args: --model ${{ inputs.model }} --max-turns 30
+          claude_args: --model ${{ inputs.model }} --max-turns 60
 
       - name: Post report
         if: always() && steps.issue.outputs.number != ''
