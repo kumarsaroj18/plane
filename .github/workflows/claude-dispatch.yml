@@ -136,6 +136,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: ${{ steps.resolve.outputs.body }}
+          show_full_output: true
           claude_args: --model ${{ inputs.model }} --max-turns 60 --allowedTools "Read,Grep,Glob,Bash,Write"
 
       - name: Post report
@@ -145,6 +146,8 @@ jobs:
         run: |
           set -euo pipefail
           NUM="${{ steps.issue.outputs.number }}"
+          echo "pwd: $(pwd)"
+          find . -maxdepth 2 -iname "*report*" -newer .git 2>/dev/null || true
           if [ -f .claude-dispatch-report.md ]; then
             gh issue comment "${NUM}" --body-file .claude-dispatch-report.md
           else
