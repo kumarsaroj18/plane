@@ -116,26 +116,38 @@ jobs:
             echo "---"
             echo ""
             echo "REPORT DELIVERY: your response in this conversation is not seen by"
-            echo "anyone. The deliverable is a single comment on issue #${ISSUE_NUMBER}."
-            echo "When your analysis is complete, write the report (following the"
-            echo "Output format section above, verbatim structure — the emoji verdict"
-            echo "line, the collapsible <details> blocks) to /tmp/report.md, then run:"
-            echo "  gh issue comment ${ISSUE_NUMBER} --body-file /tmp/report.md"
-            echo "Post exactly one comment. Do not post progress updates."
+            echo "anyone. When your analysis is complete, write the report (following"
+            echo "the Output format section above, verbatim structure — the emoji"
+            echo "verdict line, the collapsible <details> blocks) to /tmp/report.md"
+            echo "using your file-write tool. Do not run gh yourself and do not post"
+            echo "anything — a separate step posts /tmp/report.md as issue"
+            echo "#${ISSUE_NUMBER} for you once you finish."
             echo "CLAUDE_PROMPT_EOF"
           } >> "${GITHUB_OUTPUT}"
 
+      # Claude only writes /tmp/report.md — it never gets the repo-write
+      # token itself. inputs.prompt is free text on a manual dispatch, and
+      # the agent also reads repo files during analysis, either of which is
+      # a prompt-injection vector; keeping gh (and its contents/PR/issues
+      # write scope) out of Claude's own shell caps what an injection could
+      # do to "wrote a bad file," not "used a write-scoped token."
       - name: Run Claude
         uses: anthropics/claude-code-action@v1
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: ${{ steps.resolve.outputs.body }}
           claude_args: --model ${{ inputs.model }} --max-turns 30
 
-      - name: Close report issue
+      - name: Post report
         if: always() && steps.issue.outputs.number != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh issue close "${{ steps.issue.outputs.number }}"
+        run: |
+          set -euo pipefail
+          NUM="${{ steps.issue.outputs.number }}"
+          if [ -f /tmp/report.md ]; then
+            gh issue comment "${NUM}" --body-file /tmp/report.md
+          else
+            gh issue comment "${NUM}" --body "⚠️ Claude run finished without writing /tmp/report.md — check the job log for what happened."
+          fi
+          gh issue close "${NUM}"
